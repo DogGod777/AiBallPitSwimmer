@@ -1,0 +1,18 @@
+{
+  "name": "aiballpitswimmer",
+  "version": "1.0.0",
+  "description": "A test for ai in simulated water",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "physics"
+  ],
+  "author": "Aditya AGRAWAL",
+  "license": "ISC",
+  "dependencies": {
+    "matter-js": "^0.14.2"
+  }
+}
