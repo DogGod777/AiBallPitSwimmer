@@ -3,11 +3,11 @@ window.addEventListener('load', function() {
     const height = 1440;
     const agentSpawnX = width/2;
     const agentSpawnY = -500;
-    const ballWidth = 15;
-    const ballRows = 15;
-    const ballCols = 50;
-    const ballGap = 15;
-    const buffer = 50;
+    const ballWidth = 30;
+    const ballRows = 10;
+    const ballCols = 45;
+    const ballGap = 0;
+    const buffer = 0;
     //Aliases
     var Engine = Matter.Engine,
         Render = Matter.Render,
@@ -34,7 +34,7 @@ window.addEventListener('load', function() {
                 wireframes: false,
                 showAngleIndicator: false}
     });
-    
+    1
     // create balls
     // NOTE: Fix expression for the x, to spawn centered on the screen
     var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2 - ballGap/2*(ballCols-1), -250, ballCols, ballRows, ballGap, ballGap, function(x, y) {
@@ -262,7 +262,7 @@ window.addEventListener('load', function() {
         ],
     });
 
-    // create walls
+    // create ground boundary
     var ground = Bodies.rectangle(width/2, height, width, 10, { isStatic: true });
 
     //Update Loop
