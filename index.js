@@ -1,8 +1,13 @@
 window.addEventListener('load', function() {
-    const width = 1080;
-    const height = 720;
+    const width = 2160;
+    const height = 1440;
     const agentSpawnX = width/2;
-    const agentSpawnY = -100;
+    const agentSpawnY = -500;
+    const ballWidth = 15;
+    const ballRows = 15;
+    const ballCols = 50;
+    const ballGap = 15;
+    const buffer = 50;
     //Aliases
     var Engine = Matter.Engine,
         Render = Matter.Render,
@@ -13,6 +18,7 @@ window.addEventListener('load', function() {
         Composite = Matter.Composite
         Constraint = Matter.Constraint
         Constraints = Matter.constraints
+        Events = Matter.Events
     
     // create an engine
     var engine = Engine.create();
@@ -30,10 +36,10 @@ window.addEventListener('load', function() {
     });
     
     // create balls
-    var ballStack = Composites.stack(40, 0, 40, 10, 0, 0, function(x, y) {
-        return Bodies.circle(x, y, 25);
+    // NOTE: Fix expression for the x, to spawn centered on the screen
+    var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2 - ballGap/2*(ballCols-1), -250, ballCols, ballRows, ballGap, ballGap, function(x, y) {
+        return Bodies.circle(x, y, ballWidth);
     });
-    
     //Create Ragdoll
     //NOTES: ADD AGENTS' OUTPUT FUNCTION MATRIX TO RAGDOLL DEFINITION IN THE FORM OF FUNCTIONS
     const defaultCollisionGroup = -1;
@@ -243,7 +249,7 @@ window.addEventListener('load', function() {
         },
     });
 
-    const person = Composite.create({
+    agent = Composite.create({
         bodies: [legTorso, head, leftLowerArm, leftUpperArm, rightLowerArm, rightUpperArm, leftLowerLeg, rightLowerLeg],
         constraints: [
         upperToLowerLeftArm,
@@ -258,10 +264,29 @@ window.addEventListener('load', function() {
 
     // create walls
     var ground = Bodies.rectangle(width/2, height, width, 10, { isStatic: true });
-    var LWall = Bodies.rectangle(0, height/2, 10, height, { isStatic: true });
-    var RWall = Bodies.rectangle(width, height/2, 10, height, { isStatic: true });
+
+    //Update Loop
+    Events.on(engine, 'afterUpdate', function(event) {
+        for (i = 0; i < ballStack.bodies.length; i += 1) {
+            var ball = ballStack.bodies[i],
+                bounds = ball.bounds;
+
+            // move obstacles back to the top of the screen
+            if (bounds.max.x > render.bounds.max.x + ballWidth + buffer) {
+                Body.translate(ball, {
+                    x: -bounds.min.x,
+                    y: 0
+                });
+            } else if (bounds.min.x < render.bounds.min.x - ballWidth - buffer){
+                Body.translate(ball, {
+                    x: render.bounds.max.x+bounds.max.x,
+                    y: 0
+                });
+            }
+        }
+    });
     // add all of the bodies to the world
-    World.add(engine.world, [person, ballStack, ground, LWall, RWall]);
+    World.add(engine.world, [agent, ballStack, ground]);
     
     // run the engine
     Engine.run(engine);
