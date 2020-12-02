@@ -6,10 +6,15 @@ window.addEventListener('load', function() {
     const ballWidth = 30;
     const ballRows = 10;
     const ballCols = 45;
-    const chunkSize = 360;
+    const innerChunkAmt = 3;
+    const outerChunkAmt = 2;
+    const chunkSize = width/innerChunkAmt;
     const canvas = document.getElementById("world")
-
+    const diving = true;
+    const timer = 15;
+    var time = timer*60
     var offsetCounter = 0;
+
     //Aliases
     var Engine = Matter.Engine,
         Render = Matter.Render,
@@ -44,11 +49,19 @@ window.addEventListener('load', function() {
     
     // create balls
     // NOTE: Fix expression for the x, to spawn centered on the screen
-    var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2, -250, ballCols, ballRows, 0, 0, function(x, y) {
-        return Bodies.circle(x, y, ballWidth);
-    });
+    if (diving){
+        var ballStack = Composites.stack(width*5/8+50, -250, ballCols, ballRows, 0, 0, function(x, y) {
+            return Bodies.circle(x, y, ballWidth);
+        });
+    } else {
+        var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2, -250, ballCols, ballRows, 0, 0, function(x, y) {
+            return Bodies.circle(x, y, ballWidth);
+        });
+    }
+
     //Create Ragdoll
     //NOTES: ADD AGENTS' OUTPUT FUNCTION MATRIX TO RAGDOLL DEFINITION IN THE FORM OF FUNCTIONS
+    // function --> add angular velocity to limbs from function Body,addAngularVelocity(brainoutputs)
     const defaultCollisionGroup = -1;
 
     /*********************
@@ -136,7 +149,7 @@ window.addEventListener('load', function() {
     });
 
     /*****************************
-     * Define Constraints/Joints *
+     * Define Ragdoll *
      *****************************/
     const chestToRightUpperArm = Constraint.create({
         bodyA: legTorso,
@@ -274,55 +287,69 @@ window.addEventListener('load', function() {
     var LWall = Bodies.rectangle(-2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
     var RWall = Bodies.rectangle(width+2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
 
+    //OPTIONAL: Diving platform
+    var divingPlatform = Bodies.rectangle(width/2, height-height/4, width/4, height/2, {isStatic: true});
     //Update Loop(s)
-    Events.on(engine, 'beforeUpdate', function(event) {
-        Render.lookAt(render, Composite.bounds(agent), {x: width/3, y: height/3})
+    Events.on(engine, 'beforeUpdate', function(event) { //Smooth camera? Dampening?
+        Render.lookAt(render, Composite.bounds(agent), {x: width/3, y: height/3}) //camera padding also needs to scale to the innerChunk amount
 
     });
-    //Chunk render
-    //NOTE: make system better defined --> instead of 5*chunksize, make a chunk amt variable
+    //NOTE: Implement chunk refactoring code
+ 
+    //Chunk render logic
     Events.on(engine, 'afterUpdate', function(event) {
-        //lots of BUGS: Needs fixing
-
-        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize + offsetCounter*chunkSize){
+        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize + offsetCounter){ //needs refactoring
             for (i=0; i<ballStack.bodies.length; i++){
-                if(ballStack.bodies[i].bounds.max.x <= -chunkSize){
-                    Body.translate(ballStack.bodies[i], {x: 6*chunkSize, y: 0})
+                if(ballStack.bodies[i].bounds.max.x <= -chunkSize * (outerChunkAmt-1) + offsetCounter){
+                    Body.translate(ballStack.bodies[i], {x: (innerChunkAmt+2*outerChunkAmt)*chunkSize, y: 0})
                 }
             }
-            //Body.translate([ground, LWall, RWall], {x:chunkSize, y:0})
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: chunkSize, y:0}))
-            offsetCounter += 1;
-        } else if (Composite.bounds(agent).min.x <=  width/2 - chunkSize + offsetCounter*chunkSize){
+            offsetCounter += chunkSize;
+        } else if (Composite.bounds(agent).min.x <=  width/2 - chunkSize + offsetCounter){// needs refactoring
             for (i=0; i<ballStack.bodies.length; i++){
-                if(ballStack.bodies[i].bounds.min.x >= width+chunkSize){
-                    Body.translate(ballStack.bodies[i], {x: -6*chunkSize, y: 0})
+                if(ballStack.bodies[i].bounds.min.x >= width + chunkSize * (outerChunkAmt-1) + offsetCounter){
+                    Body.translate(ballStack.bodies[i], {x: -(innerChunkAmt+2*outerChunkAmt)*chunkSize, y: 0})
                 }
             }
-            //Body.translate([ground, LWall, RWall], {x:-chunkSize, y:0});
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: -chunkSize, y:0}))
+            offsetCounter -= chunkSize;
         }
     });
-    // add all of the bodies to the world
-    World.add(engine.world, [agent, ballStack, ground, LWall, RWall])
 
+    // add all of the bodies to the world
+    if (diving) {
+        World.add(engine.world, [agent, ballStack, ground, divingPlatform, LWall, RWall])
+    } else {
+        World.add(engine.world, [agent, ballStack, ground, LWall, RWall])
+    }
     // run the engine
     Engine.run(engine);
     
     // run the renderer
     Render.run(render);
     
+    //After 15s (evolution simulator)
+    //Fitness = Composite.bounds(agent).max.x
+
+    /*NOTES: To Add:
+    - USER INTERFACE
+      - Countdown
+      - FPS
+      - UI FITNESS COUNTER (See Distance tracker carykh evolution simulator)
+      - OPTION TOGGLES --> boxes that can be checked or not, options will apply on restart
+      - RESTART BUTTON
+    */
+
     //Temporarily added for debugging purposely.
     document.body.addEventListener("keydown", function(e){ 
         switch(e.which){
           case 65:
             agent.bodies.forEach(body => Body.setVelocity(body, {x: -50, y: 0}));
             break;
-            
           case 68:
             agent.bodies.forEach(body => Body.setVelocity(body, {x: 50, y: 0}));
             break;
-            
           case 87:
             agent.bodies.forEach(body => Body.setVelocity(body, {x: 0, y: -50}));
             break;
