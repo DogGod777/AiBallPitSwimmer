@@ -6,38 +6,45 @@ window.addEventListener('load', function() {
     const ballWidth = 30;
     const ballRows = 10;
     const ballCols = 45;
-    const ballGap = 0;
-    const buffer = 0;
+    const chunkSize = 360;
+    const canvas = document.getElementById("world")
+
+    var offsetCounter = 0;
     //Aliases
     var Engine = Matter.Engine,
         Render = Matter.Render,
         World = Matter.World,
-        Bodies = Matter.Bodies;
-        Body = Matter.Body
-        Composites = Matter.Composites
-        Composite = Matter.Composite
-        Constraint = Matter.Constraint
-        Constraints = Matter.constraints
-        Events = Matter.Events
+        Bodies = Matter.Bodies,
+        Body = Matter.Body,
+        Composites = Matter.Composites,
+        Composite = Matter.Composite,
+        Constraint = Matter.Constraint,
+        Constraints = Matter.constraints,
+        Events = Matter.Events,
+        Bounds = Matter.Bounds;
     
     // create an engine
     var engine = Engine.create();
     
     // create a renderer
     var render = Render.create({
-            canvas: document.getElementById("world"),
+            canvas: canvas,
             engine: engine,
             options: {
                 width: width,
                 height: height,
                 background: '#000',
                 wireframes: false,
-                showAngleIndicator: false}
+                showAngleIndicator: false,
+                hasBounds: true
+            }
     });
-    1
+    
+    var originalRenderBounds = render.bounds
+    
     // create balls
     // NOTE: Fix expression for the x, to spawn centered on the screen
-    var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2 - ballGap/2*(ballCols-1), -250, ballCols, ballRows, ballGap, ballGap, function(x, y) {
+    var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2, -250, ballCols, ballRows, 0, 0, function(x, y) {
         return Bodies.circle(x, y, ballWidth);
     });
     //Create Ragdoll
@@ -262,36 +269,63 @@ window.addEventListener('load', function() {
         ],
     });
 
-    // create ground boundary
-    var ground = Bodies.rectangle(width/2, height, width, 10, { isStatic: true });
+    // create boundaries
+    var ground = Bodies.rectangle(width/2, height, width+4*chunkSize, 3*ballWidth, { isStatic: true });
+    var LWall = Bodies.rectangle(-2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
+    var RWall = Bodies.rectangle(width+2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
 
-    //Update Loop
+    //Update Loop(s)
+    Events.on(engine, 'beforeUpdate', function(event) {
+        Render.lookAt(render, Composite.bounds(agent), {x: width/3, y: height/3})
+
+    });
+    //Chunk render
+    //NOTE: make system better defined --> instead of 5*chunksize, make a chunk amt variable
     Events.on(engine, 'afterUpdate', function(event) {
-        for (i = 0; i < ballStack.bodies.length; i += 1) {
-            var ball = ballStack.bodies[i],
-                bounds = ball.bounds;
+        //lots of BUGS: Needs fixing
 
-            // move obstacles back to the top of the screen
-            if (bounds.max.x > render.bounds.max.x + ballWidth + buffer) {
-                Body.translate(ball, {
-                    x: -bounds.min.x,
-                    y: 0
-                });
-            } else if (bounds.min.x < render.bounds.min.x - ballWidth - buffer){
-                Body.translate(ball, {
-                    x: render.bounds.max.x+bounds.max.x,
-                    y: 0
-                });
+        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize + offsetCounter*chunkSize){
+            for (i=0; i<ballStack.bodies.length; i++){
+                if(ballStack.bodies[i].bounds.max.x <= -chunkSize){
+                    Body.translate(ballStack.bodies[i], {x: 6*chunkSize, y: 0})
+                }
             }
+            //Body.translate([ground, LWall, RWall], {x:chunkSize, y:0})
+            [ground, LWall, RWall].forEach(body => Body.translate(body, {x: chunkSize, y:0}))
+            offsetCounter += 1;
+        } else if (Composite.bounds(agent).min.x <=  width/2 - chunkSize + offsetCounter*chunkSize){
+            for (i=0; i<ballStack.bodies.length; i++){
+                if(ballStack.bodies[i].bounds.min.x >= width+chunkSize){
+                    Body.translate(ballStack.bodies[i], {x: -6*chunkSize, y: 0})
+                }
+            }
+            //Body.translate([ground, LWall, RWall], {x:-chunkSize, y:0});
+            [ground, LWall, RWall].forEach(body => Body.translate(body, {x: -chunkSize, y:0}))
         }
     });
     // add all of the bodies to the world
-    World.add(engine.world, [agent, ballStack, ground]);
-    
+    World.add(engine.world, [agent, ballStack, ground, LWall, RWall])
+
     // run the engine
     Engine.run(engine);
     
     // run the renderer
     Render.run(render);
-
+    
+    //Temporarily added for debugging purposely.
+    document.body.addEventListener("keydown", function(e){ 
+        switch(e.which){
+          case 65:
+            agent.bodies.forEach(body => Body.setVelocity(body, {x: -50, y: 0}));
+            break;
+            
+          case 68:
+            agent.bodies.forEach(body => Body.setVelocity(body, {x: 50, y: 0}));
+            break;
+            
+          case 87:
+            agent.bodies.forEach(body => Body.setVelocity(body, {x: 0, y: -50}));
+            break;
+        }
+    })
 });
