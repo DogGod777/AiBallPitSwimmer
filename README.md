@@ -8,8 +8,10 @@ The reward function being how far he can go, and his outputs being a torque forc
 Status: Get working simulation
 
 Steps for the future:
-1. implement core game loop
-2. implement ai
-3. implement ui
-4. implement data i/o (read/write) for extended training
-5. publish findings here
+1. implement ai
+2. implement ui
+3. implement data i/o (read/write) for extended training
+4. publish findings here
+
+Complete:
+1. Main game loop, working w/ out Ai
