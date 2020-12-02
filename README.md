@@ -8,10 +8,12 @@ The reward function being how far he can go, and his outputs being a torque forc
 Status: Get working simulation
 
 Steps for the future:
-1. implement ai
-2. implement ui
-3. implement data i/o (read/write) for extended training
-4. publish findings here
+1. implement ui
+2. implement data i/o (read/write) for extended training
+3. publish findings here
+
+In progress:
+1. implementing AI, using Neataptic.js
 
 Complete:
 1. Main game loop, working w/ out Ai
