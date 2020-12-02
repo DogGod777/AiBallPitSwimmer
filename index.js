@@ -48,7 +48,6 @@ window.addEventListener('load', function() {
     var originalRenderBounds = render.bounds
     
     // create balls
-    // NOTE: Fix expression for the x, to spawn centered on the screen
     if (diving){
         var ballStack = Composites.stack(width*5/8+50, -250, ballCols, ballRows, 0, 0, function(x, y) {
             return Bodies.circle(x, y, ballWidth);
@@ -59,9 +58,6 @@ window.addEventListener('load', function() {
         });
     }
 
-    //Create Ragdoll
-    //NOTES: ADD AGENTS' OUTPUT FUNCTION MATRIX TO RAGDOLL DEFINITION IN THE FORM OF FUNCTIONS
-    // function --> add angular velocity to limbs from function Body,addAngularVelocity(brainoutputs)
     const defaultCollisionGroup = -1;
 
     /*********************
@@ -282,23 +278,31 @@ window.addEventListener('load', function() {
         ],
     });
 
+    //NOTE: body index is discrete integer from 0 - 7
+    //Force magnitude from -Math.pi/30 --> +Math.pi/30
+    //when implementing output layer
+    function applyForceToLimb(bodyIndex, forceMagnitude){
+        Body,setAngularVelocity(agent.bodies[bodyIndex], forceMagnitude);
+    }
+
     // create boundaries
     var ground = Bodies.rectangle(width/2, height, width+4*chunkSize, 3*ballWidth, { isStatic: true });
     var LWall = Bodies.rectangle(-2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
     var RWall = Bodies.rectangle(width+2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
 
     //OPTIONAL: Diving platform
+    //BUG: Remove gaps behind the board
+    //Solution: Spawn balls half in front, half behind
     var divingPlatform = Bodies.rectangle(width/2, height-height/4, width/4, height/2, {isStatic: true});
     //Update Loop(s)
     Events.on(engine, 'beforeUpdate', function(event) { //Smooth camera? Dampening?
-        Render.lookAt(render, Composite.bounds(agent), {x: chunkSize*innerChunkAmt*1/2, y: height/3}) //camera padding also needs to scale to the innerChunk amount
+        Render.lookAt(render, Composite.bounds(agent), {x: chunkSize*innerChunkAmt*1/2, y: height/3})
 
     });
-    //NOTE: Implement chunk refactoring code
  
     //Chunk render logic
     Events.on(engine, 'afterUpdate', function(event) {
-        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize/2 + offsetCounter){ //needs refactoring
+        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize/2 + offsetCounter){ 
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.max.x <= -chunkSize * (outerChunkAmt-1) + offsetCounter){
                     Body.translate(ballStack.bodies[i], {x: (innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
@@ -306,7 +310,7 @@ window.addEventListener('load', function() {
             }
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: chunkSize, y:0}))
             offsetCounter += chunkSize;
-        } else if (Composite.bounds(agent).max.x <=  width/2 - chunkSize/2 + offsetCounter){// needs refactoring
+        } else if (Composite.bounds(agent).max.x <=  width/2 - chunkSize/2 + offsetCounter){
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.min.x >= width + chunkSize * (outerChunkAmt-1) + offsetCounter){
                     Body.translate(ballStack.bodies[i], {x: -(innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
@@ -340,19 +344,4 @@ window.addEventListener('load', function() {
       - OPTION TOGGLES --> boxes that can be checked or not, options will apply on restart
       - RESTART BUTTON
     */
-
-    //Temporarily added for debugging purposely.
-    document.body.addEventListener("keydown", function(e){ 
-        switch(e.which){
-          case 65:
-            agent.bodies.forEach(body => Body.setVelocity(body, {x: -50, y: 0}));
-            break;
-          case 68:
-            agent.bodies.forEach(body => Body.setVelocity(body, {x: 50, y: 0}));
-            break;
-          case 87:
-            agent.bodies.forEach(body => Body.setVelocity(body, {x: 0, y: -50}));
-            break;
-        }
-    })
 });
