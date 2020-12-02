@@ -3,14 +3,14 @@ window.addEventListener('load', function() {
     const height = 1440;
     const agentSpawnX = width/2;
     const agentSpawnY = -500;
-    const ballWidth = 30;
-    const ballRows = 10;
-    const ballCols = 45;
     const innerChunkAmt = 3;
     const outerChunkAmt = 2;
     const chunkSize = width/innerChunkAmt;
+    const ballWidth = 25;
+    const ballRows = 5;
+    const ballCols = (innerChunkAmt + 2*outerChunkAmt)*chunkSize/ballWidth * 1/2-2;
     const canvas = document.getElementById("world")
-    const diving = true;
+    const diving = false;
     const timer = 15;
     var time = timer*60
     var offsetCounter = 0;
@@ -291,25 +291,25 @@ window.addEventListener('load', function() {
     var divingPlatform = Bodies.rectangle(width/2, height-height/4, width/4, height/2, {isStatic: true});
     //Update Loop(s)
     Events.on(engine, 'beforeUpdate', function(event) { //Smooth camera? Dampening?
-        Render.lookAt(render, Composite.bounds(agent), {x: width/3, y: height/3}) //camera padding also needs to scale to the innerChunk amount
+        Render.lookAt(render, Composite.bounds(agent), {x: chunkSize*innerChunkAmt*1/2, y: height/3}) //camera padding also needs to scale to the innerChunk amount
 
     });
     //NOTE: Implement chunk refactoring code
  
     //Chunk render logic
     Events.on(engine, 'afterUpdate', function(event) {
-        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize + offsetCounter){ //needs refactoring
+        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize/2 + offsetCounter){ //needs refactoring
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.max.x <= -chunkSize * (outerChunkAmt-1) + offsetCounter){
-                    Body.translate(ballStack.bodies[i], {x: (innerChunkAmt+2*outerChunkAmt)*chunkSize, y: 0})
+                    Body.translate(ballStack.bodies[i], {x: (innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
                 }
             }
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: chunkSize, y:0}))
             offsetCounter += chunkSize;
-        } else if (Composite.bounds(agent).min.x <=  width/2 - chunkSize + offsetCounter){// needs refactoring
+        } else if (Composite.bounds(agent).max.x <=  width/2 - chunkSize/2 + offsetCounter){// needs refactoring
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.min.x >= width + chunkSize * (outerChunkAmt-1) + offsetCounter){
-                    Body.translate(ballStack.bodies[i], {x: -(innerChunkAmt+2*outerChunkAmt)*chunkSize, y: 0})
+                    Body.translate(ballStack.bodies[i], {x: -(innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
                 }
             }
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: -chunkSize, y:0}))
