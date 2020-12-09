@@ -1,19 +1,21 @@
 window.addEventListener('load', function() {
+    //Canvas variables
+    const canvas = document.getElementById("world")
     const width = 2160;
     const height = 1440;
-    const agentSpawnX = width/2;
-    const agentSpawnY = -500;
+
+    //Chunk variables
     const innerChunkAmt = 3;
     const outerChunkAmt = 2;
     const chunkSize = width/innerChunkAmt;
+    var offsetCounter = 0; 
+
+    //Ball variables
     const ballWidth = 25;
     const ballRows = 5;
     const ballCols = (innerChunkAmt + 2*outerChunkAmt)*chunkSize/ballWidth * 1/2-2;
-    const canvas = document.getElementById("world")
+
     const diving = false;
-    const timer = 15;
-    var time = timer*60
-    var offsetCounter = 0;
 
     //Aliases
     var Engine = Matter.Engine,
@@ -27,7 +29,110 @@ window.addEventListener('load', function() {
         Constraints = Matter.constraints,
         Events = Matter.Events,
         Bounds = Matter.Bounds;
+
+    //NEAT Aliases
+
+    var Neat    = neataptic.Neat;
+        Methods = neataptic.methods;
+        Config  = neataptic.config;
+        Architect = neataptic.architect;
     
+    Config.warnings = false;
+
+    //NEAT Exoeriment Variables
+    // GA settings
+    //var PLAYER_AMOUNT    = Math.round(2.3e-4 * WIDTH * HEIGHT);
+    var PLAYER_AMOUNT    = 1;
+    var ITERATIONS       = 10e4; // should be ~250 for real use
+    var MUTATION_RATE    = 0.3;
+    var ELITISM          = Math.round(0.1 * PLAYER_AMOUNT);
+
+    // Trained population
+    var USE_TRAINED_POP = false;
+
+    /** Global vars */
+    var neat = new Neat(
+        4, 8,
+        null,
+        {
+        mutation: [
+            Methods.mutation.ADD_NODE,
+            Methods.mutation.SUB_NODE,
+            Methods.mutation.ADD_CONN,
+            Methods.mutation.SUB_CONN,
+            Methods.mutation.MOD_WEIGHT,
+            Methods.mutation.MOD_BIAS,
+            Methods.mutation.MOD_ACTIVATION,
+            Methods.mutation.ADD_GATE,
+            Methods.mutation.SUB_GATE,
+            Methods.mutation.ADD_SELF_CONN,
+            Methods.mutation.SUB_SELF_CONN,
+            Methods.mutation.ADD_BACK_CONN,
+            Methods.mutation.SUB_BACK_CONN
+        ],
+        popsize: PLAYER_AMOUNT,
+        mutationRate: MUTATION_RATE,
+        elitism: ELITISM
+        }
+    );
+
+    if(USE_TRAINED_POP){
+        neat.population = population;
+    }
+
+    //Runtime variables 
+    var iteration = 0;
+
+    /** Start the evaluation of the current generation */
+    //FIX: Make it so that the simulation is reset.
+    //buggy: make proper
+    function startEvaluation(){
+        players = [];
+        highestScore = 0;
+    
+        for(var genome in neat.population){
+            genome = neat.population[genome];
+            new Agent(genome);
+        }
+    }
+    
+    //Start first evaluation
+    startEvaluation();
+
+    function endEvaluation(){
+        console.log('Generation:', neat.generation, '- average score:', Math.round(neat.getAverage()));
+        console.log('Fittest score:', Math.round(neat.getFittest().score));
+      
+        // Networks shouldn't get too big
+        for(var genome in neat.population){
+          genome = neat.population[genome];
+          genome.score -= genome.nodes.length *  width / 10;
+        }
+      
+        // Sort the population by score
+        neat.sort();
+      
+        // Init new pop
+        var newPopulation = [];
+      
+        // Elitism
+        for(var i = 0; i < neat.elitism; i++){
+          newPopulation.push(neat.population[i]);
+        }
+      
+        // Breed the next individuals
+        for(var i = 0; i < neat.popsize - neat.elitism; i++){
+          newPopulation.push(neat.getOffspring());
+        }
+      
+        // Replace the old population with the new population
+        neat.population = newPopulation;
+        neat.mutate();
+      
+        neat.generation++;
+        startEvaluation();
+      }
+
     // create an engine
     var engine = Engine.create();
     
@@ -45,244 +150,19 @@ window.addEventListener('load', function() {
             }
     });
     
-    var originalRenderBounds = render.bounds
-    
-    // create balls
+    //BUG: Remove gaps behind the board
+    //Solution: Spawn balls half in front, half behind - (still doesn't work)
+    var divingPlatform = Bodies.rectangle(width/2, height-height/4, width/4, height/2, {isStatic: true});
+    //If diving --> spawn diving board and position balls differently
     if (diving){
         var ballStack = Composites.stack(width*5/8+50, -250, ballCols, ballRows, 0, 0, function(x, y) {
             return Bodies.circle(x, y, ballWidth);
         });
+        World.add(engine.world, divingPlatform);
     } else {
         var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2, -250, ballCols, ballRows, 0, 0, function(x, y) {
             return Bodies.circle(x, y, ballWidth);
         });
-    }
-
-    const defaultCollisionGroup = -1;
-
-    /*********************
-     * Define Body Parts *
-     *********************/
-    const headOptions = {
-        friction: 1,
-        frictionAir: 0.05,
-        render: {
-        fillStyle: "#FFBC42",
-        },
-    };
-    const chestOptions = {
-        friction: 1,
-        frictionAir: 0.05,
-        collisionFilter: {
-        group: defaultCollisionGroup - 1,
-        },
-        chamfer: {
-        radius: 20,
-        },
-        label: "chest",
-        render: {
-        fillStyle: "#E0A423",
-        },
-    };
-    const armOptions = {
-        friction: 1,
-        frictionAir: 0.03,
-        collisionFilter: {
-        group: defaultCollisionGroup,
-        },
-        chamfer: {
-        radius: 10,
-        },
-        render: {
-        fillStyle: "#FFBC42",
-        },
-    };
-    const legOptions = {
-        friction: 1,
-        frictionAir: 0.03,
-        collisionFilter: {
-        group: defaultCollisionGroup - 1,
-        },
-        chamfer: {
-        radius: 10,
-        },
-        render: {
-        fillStyle: "#FFBC42",
-        },
-    };
-
-    const lowerLegOptions = {
-        friction: 1,
-        frictionAir: 0.03,
-        collisionFilter: {
-        group: defaultCollisionGroup - 1,
-        },
-        chamfer: {
-        radius: 10,
-        },
-        render: {
-        fillStyle: "#E59B12",
-        },
-    };
-
-    const head = Bodies.circle(agentSpawnX, agentSpawnY - 70, 30, headOptions);
-    chest = Bodies.rectangle(agentSpawnX, agentSpawnY, 60, 80, chestOptions);
-    chest.size = 40; // To determine overlap of goal
-    const rightUpperArm = Bodies.rectangle(agentSpawnX + 40, agentSpawnY - 20, 20, 40, Object.assign({}, armOptions));
-    const rightLowerArm = Bodies.rectangle(agentSpawnX + 40, agentSpawnY + 20, 20, 60, Object.assign({}, armOptions));
-    const leftUpperArm = Bodies.rectangle(agentSpawnX - 40, agentSpawnY - 20, 20, 40, Object.assign({}, armOptions));
-    const leftLowerArm = Bodies.rectangle(agentSpawnX - 40, agentSpawnY + 20, 20, 60, Object.assign({}, armOptions));
-    const leftUpperLeg = Bodies.rectangle(agentSpawnX - 20, agentSpawnY + 60, 20, 40, Object.assign({}, legOptions));
-    const rightUpperLeg = Bodies.rectangle(agentSpawnX + 20, agentSpawnY + 60, 20, 40, Object.assign({}, legOptions));
-    const leftLowerLeg = Bodies.rectangle(agentSpawnX - 20, agentSpawnY + 100, 20, 60, Object.assign({}, lowerLegOptions));
-    const rightLowerLeg = Bodies.rectangle(agentSpawnX + 20, agentSpawnY + 100, 20, 60, Object.assign({}, lowerLegOptions));
-
-    const legTorso = Body.create({
-        parts: [chest, leftUpperLeg, rightUpperLeg],
-        collisionFilter: {
-        group: defaultCollisionGroup - 1,
-        },
-    });
-
-    /*****************************
-     * Define Ragdoll *
-     *****************************/
-    const chestToRightUpperArm = Constraint.create({
-        bodyA: legTorso,
-        pointA: {
-        x: 25,
-        y: -40,
-        },
-        pointB: {
-        x: -5,
-        y: -10,
-        },
-        bodyB: rightUpperArm,
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-    const chestToLeftUpperArm = Constraint.create({
-        bodyA: legTorso,
-        pointA: {
-        x: -25,
-        y: -40,
-        },
-        pointB: {
-        x: 5,
-        y: -10,
-        },
-        bodyB: leftUpperArm,
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-
-    const upperToLowerRightArm = Constraint.create({
-        bodyA: rightUpperArm,
-        bodyB: rightLowerArm,
-        pointA: {
-        x: 0,
-        y: 15,
-        },
-        pointB: {
-        x: 0,
-        y: -20,
-        },
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-
-    const upperToLowerLeftArm = Constraint.create({
-        bodyA: leftUpperArm,
-        bodyB: leftLowerArm,
-        pointA: {
-        x: 0,
-        y: 15,
-        },
-        pointB: {
-        x: 0,
-        y: -20,
-        },
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-
-    const upperToLowerLeftLeg = Constraint.create({
-        bodyA: legTorso,
-        bodyB: leftLowerLeg,
-        pointA: {
-        x: -20,
-        y: 60,
-        },
-        pointB: {
-        x: 0,
-        y: -25,
-        },
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-
-    const upperToLowerRightLeg = Constraint.create({
-        bodyA: legTorso,
-        bodyB: rightLowerLeg,
-        pointA: {
-        x: 20,
-        y: 60,
-        },
-        pointB: {
-        x: 0,
-        y: -25,
-        },
-        stiffness: 0.2,
-        render: {
-        visible: false,
-        },
-    });
-
-    const headContraint = Constraint.create({
-        bodyA: head,
-        pointA: {
-        x: 0,
-        y: 20,
-        },
-        pointB: {
-        x: 0,
-        y: -50,
-        },
-        bodyB: legTorso,
-        stiffness: 0.3,
-        render: {
-        visible: false,
-        },
-    });
-
-    agent = Composite.create({
-        bodies: [legTorso, head, leftLowerArm, leftUpperArm, rightLowerArm, rightUpperArm, leftLowerLeg, rightLowerLeg],
-        constraints: [
-        upperToLowerLeftArm,
-        upperToLowerRightArm,
-        chestToLeftUpperArm,
-        chestToRightUpperArm,
-        headContraint,
-        upperToLowerLeftLeg,
-        upperToLowerRightLeg,
-        ],
-    });
-
-    //NOTE: body index is discrete integer from 0 - 7
-    //Force magnitude from -Math.pi/30 --> +Math.pi/30
-    //when implementing output layer
-    function applyForceToLimb(bodyIndex, forceMagnitude){
-        Body,setAngularVelocity(agent.bodies[bodyIndex], forceMagnitude);
     }
 
     // create boundaries
@@ -290,19 +170,23 @@ window.addEventListener('load', function() {
     var LWall = Bodies.rectangle(-2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
     var RWall = Bodies.rectangle(width+2*chunkSize, height/2,  3*ballWidth, height, {isStatic: true});
 
-    //OPTIONAL: Diving platform
-    //BUG: Remove gaps behind the board
-    //Solution: Spawn balls half in front, half behind
-    var divingPlatform = Bodies.rectangle(width/2, height-height/4, width/4, height/2, {isStatic: true});
-    //Update Loop(s)
+    //Update Loop(s) --
+
+    //Update Camera (follow player)
     Events.on(engine, 'beforeUpdate', function(event) { //Smooth camera? Dampening?
-        Render.lookAt(render, Composite.bounds(agent), {x: chunkSize*innerChunkAmt*1/2, y: height/3})
+        var agentBounds = Composite.bounds(players[0].physics) //edit these bounds so that player is centered at 1/3 height from bottom, not centered
+        agentBounds.min.y -= height/3;
+        agentBounds.min.y -= height/3;
+        Render.lookAt(render, agentBounds, {x: chunkSize*innerChunkAmt*1/2, y: height/3});
 
     });
  
+    
     //Chunk render logic
+    //IDEAS: case - everyone in the same simulation, avg max x rather than first max x
     Events.on(engine, 'afterUpdate', function(event) {
-        if (Composite.bounds(agent).max.x >=  width/2 + chunkSize/2 + offsetCounter){ 
+        bounds = Composite.bounds(players[0].physics);
+        if (bounds.max.x >=  width/2 + chunkSize/2 + offsetCounter){  // if agent moved to the right too far, move leftmost chunk to the far right
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.max.x <= -chunkSize * (outerChunkAmt-1) + offsetCounter){
                     Body.translate(ballStack.bodies[i], {x: (innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
@@ -310,7 +194,7 @@ window.addEventListener('load', function() {
             }
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: chunkSize, y:0}))
             offsetCounter += chunkSize;
-        } else if (Composite.bounds(agent).max.x <=  width/2 - chunkSize/2 + offsetCounter){
+        } else if (bounds.max.x <=  width/2 - chunkSize/2 + offsetCounter){ // same for the left
             for (i=0; i<ballStack.bodies.length; i++){
                 if(ballStack.bodies[i].bounds.min.x >= width + chunkSize * (outerChunkAmt-1) + offsetCounter){
                     Body.translate(ballStack.bodies[i], {x: -(innerChunkAmt+2*outerChunkAmt)*chunkSize + ballWidth, y: -5*ballWidth})
@@ -319,13 +203,29 @@ window.addEventListener('load', function() {
             [ground, LWall, RWall].forEach(body => Body.translate(body, {x: -chunkSize, y:0}))
             offsetCounter -= chunkSize;
         }
+        for (i=0; i<ballStack.bodies.length; i++){  //If balls below the map
+            if(ballStack.bodies[i].bounds.max.y >= height+3*ballWidth){
+                Body.setPosition(ballStack.bodies[i], {x: ballStack.bodies[i].x, y: height-ballWidth})
+            }
+        }
+
+        if(iteration == ITERATIONS){
+            endEvaluation();
+            iteration = 0;
+        }
+
+        //Update agent position based based on brain outputs
+        players.forEach(player => {player.update(); 
+                                  player.score()});
+        
+        iteration++;
     });
 
     // add all of the bodies to the world
-    if (diving) {
-        World.add(engine.world, [agent, ballStack, ground, divingPlatform, LWall, RWall])
-    } else {
-        World.add(engine.world, [agent, ballStack, ground, LWall, RWall])
+    World.add(engine.world, [ballStack, ground, LWall, RWall]);
+
+    for (var i=0; i<players.length; i++){
+        World.add(engine.world, players[i].physics)
     }
     // run the engine
     Engine.run(engine);
@@ -334,14 +234,31 @@ window.addEventListener('load', function() {
     Render.run(render);
     
     //After 15s (evolution simulator)
-    //Fitness = Composite.bounds(agent).max.x
 
     /*NOTES: To Add:
     - USER INTERFACE
       - Countdown
       - FPS
       - UI FITNESS COUNTER (See Distance tracker carykh evolution simulator)
-      - OPTION TOGGLES --> boxes that can be checked or not, options will apply on restart
+      - OPTION TOGGLES --> css checkboxes,  options will be applied on next evaluation
       - RESTART BUTTON
+      - SAVE POPULATION TO FILE BUTTON
     */
+       //Temporarily added for debugging purposely.
+       document.body.addEventListener("keydown", function(e){ 
+        switch(e.which){
+          case 65:
+            players[0].physics.bodies.forEach(body => Body.setVelocity(body, {x: -50, y: 0}));
+            break;
+          case 68:
+            players[0].physics.bodies.forEach(body => Body.setVelocity(body, {x: 50, y: 0}));
+            break;
+          case 87:
+            players[0].physics.bodies.forEach(body => Body.setVelocity(body, {x: 0, y: -50}));
+            break;
+        case 83:
+            players[0].physics.bodies.forEach(body => Body.setVelocity(body, {x: 0, y:50}));
+            break;
+        }
+    })
 });
