@@ -1,14 +1,13 @@
-const width = 2160;
-const height = 1440;
+const width = 1080;
+const height = 720;
 
 const agentSpawnX = width/2;
 const agentSpawnY = -500;
 
-const MAX_TORQUE = Math.PI/30;
+const MAX_TORQUE = 0.25;
 
 var Engine = Matter.Engine,
         Render = Matter.Render,
-        World = Matter.World,
         Bodies = Matter.Bodies,
         Body = Matter.Body,
         Composites = Matter.Composites,
@@ -19,25 +18,29 @@ var Engine = Matter.Engine,
         Bounds = Matter.Bounds;
 
 function Agent (genome) {
-
     /*********************
      * Define Body Parts *
      *********************/
+    layer = players.length * 3
+
     const headOptions = {
         friction: 1,
         frictionAir: 0.05,
+        collisionFilter: {
+            group: layer,
+        },
         render: {
-        fillStyle: "#FFBC42",
+            fillStyle: "#FFBC42",
         },
     };
     const chestOptions = {
         friction: 1,
         frictionAir: 0.05,
         collisionFilter: {
-        group: -2,
+           group: layer-2,
         },
         chamfer: {
-        radius: 20,
+            radius: 20,
         },
         label: "chest",
         render: {
@@ -48,39 +51,39 @@ function Agent (genome) {
         friction: 1,
         frictionAir: 0.03,
         collisionFilter: {
-        group: -1,
+           group: layer-1,
         },
         chamfer: {
-        radius: 10,
+            radius: 10,
         },
         render: {
-        fillStyle: "#FFBC42",
+            fillStyle: "#FFBC42",
         },
     };
     const legOptions = {
         friction: 1,
         frictionAir: 0.03,
         collisionFilter: {
-        group: -2,
+           group: layer-2,
         },
         chamfer: {
-        radius: 10,
+            radius: 10,
         },
         render: {
-        fillStyle: "#FFBC42",
+            fillStyle: "#FFBC42",
         },
     };
     const lowerLegOptions = {
         friction: 1,
         frictionAir: 0.03,
         collisionFilter: {
-        group: -2,
+           group: layer-2,
         },
         chamfer: {
-        radius: 10,
+            radius: 10,
         },
         render: {
-        fillStyle: "#E59B12",
+            fillStyle: "#E59B12",
         },
     };
 
@@ -105,7 +108,7 @@ function Agent (genome) {
     const legTorso = Body.create({
         parts: [chest, leftUpperLeg, rightUpperLeg],
         collisionFilter: {
-        group: -2,
+           group: layer-2,
         },
     });
 
@@ -226,7 +229,7 @@ function Agent (genome) {
     });
 
     this.physics = Composite.create({
-        bodies: [legTorso, head, leftLowerArm, leftUpperArm, rightLowerArm, rightUpperArm, leftLowerLeg, rightLowerLeg],
+        bodies: [head, legTorso, leftLowerArm, leftUpperArm, rightLowerArm, rightUpperArm, leftLowerLeg, rightLowerLeg],
         constraints: [
         upperToLowerLeftArm,
         upperToLowerRightArm,
@@ -242,6 +245,7 @@ function Agent (genome) {
     //NOTE: body index is discrete integer from 0 - 7
     //Force magnitude from -Math.pi/30 --> +Math.pi/30
     //when implementing output layer --> fix bug all values are the same
+    //all values are positive? allow for negative values
 Agent.prototype = {
     applyForceToLimb: function(bodyIndex, forceMagnitude){
         Body.setAngularVelocity(this.physics.bodies[bodyIndex], forceMagnitude);
@@ -257,15 +261,16 @@ Agent.prototype = {
                      bounds.min.y,
                      bounds.max.y];
         var output = this.brain.activate(input);
-        console.log(output);
+        //console.log(output);
     
-        for (var i=0; i<output.length; i++){
+        for (var i=1; i<output.length; i++){
             //Normalise outputs
-            output[i] = output[i] > MAX_TORQUE ? MAX_TORQUE  : output[i] < -MAX_TORQUE  ? -MAX_TORQUE  : output[i];
+            output[i] = output[i] * MAX_TORQUE * 2 - MAX_TORQUE;
+            output[i] = output[i] > MAX_TORQUE ? MAX_TORQUE  : output[i] < -MAX_TORQUE  ? -MAX_TORQUE  : output[i]; //BUG
 
             //Apply force
             this.applyForceToLimb(i, output[i])
         }
     }
 }
-// Add in offsets for TRAINING in Paralell, grid of simulations, too expensive?
+// Add in offsets for TRAINING in Paralell, overlay

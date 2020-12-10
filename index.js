@@ -1,8 +1,7 @@
 window.addEventListener('load', function() {
+    /** Global vars */
     //Canvas variables
     const canvas = document.getElementById("world")
-    const width = 2160;
-    const height = 1440;
 
     //Chunk variables
     const innerChunkAmt = 3;
@@ -14,13 +13,12 @@ window.addEventListener('load', function() {
     const ballWidth = 25;
     const ballRows = 5;
     const ballCols = (innerChunkAmt + 2*outerChunkAmt)*chunkSize/ballWidth * 1/2-2;
-
+    const balls = false;
     const diving = false;
 
     //Aliases
     var Engine = Matter.Engine,
         Render = Matter.Render,
-        World = Matter.World,
         Bodies = Matter.Bodies,
         Body = Matter.Body,
         Composites = Matter.Composites,
@@ -40,19 +38,18 @@ window.addEventListener('load', function() {
     Config.warnings = false;
 
     //NEAT Exoeriment Variables
-    // GA settings
+    //GA settings
     //var PLAYER_AMOUNT    = Math.round(2.3e-4 * WIDTH * HEIGHT);
-    var PLAYER_AMOUNT    = 1;
-    var ITERATIONS       = 10e4; // should be ~250 for real use
+    var PLAYER_AMOUNT    = 10;
+    var ITERATIONS       = 10e2; // should be ~250 for real use
     var MUTATION_RATE    = 0.3;
     var ELITISM          = Math.round(0.1 * PLAYER_AMOUNT);
 
     // Trained population
     var USE_TRAINED_POP = false;
 
-    /** Global vars */
     var neat = new Neat(
-        4, 8,
+        4, 7,
         null,
         {
         mutation: [
@@ -83,6 +80,9 @@ window.addEventListener('load', function() {
     //Runtime variables 
     var iteration = 0;
 
+    // create an engine
+    var engine = Engine.create();
+    
     /** Start the evaluation of the current generation */
     //FIX: Make it so that the simulation is reset.
     //buggy: make proper
@@ -92,10 +92,12 @@ window.addEventListener('load', function() {
     
         for(var genome in neat.population){
             genome = neat.population[genome];
-            new Agent(genome);
+            agent = new Agent(genome)
+            Composite.add(engine.world, agent.physics);
+
         }
     }
-    
+
     //Start first evaluation
     startEvaluation();
 
@@ -130,12 +132,11 @@ window.addEventListener('load', function() {
         neat.mutate();
       
         neat.generation++;
-        startEvaluation();
-      }
 
-    // create an engine
-    var engine = Engine.create();
-    
+        players.forEach(player => Composite.remove(engine.world, player.physics))
+        startEvaluation();
+    }
+
     // create a renderer
     var render = Render.create({
             canvas: canvas,
@@ -158,7 +159,7 @@ window.addEventListener('load', function() {
         var ballStack = Composites.stack(width*5/8+50, -250, ballCols, ballRows, 0, 0, function(x, y) {
             return Bodies.circle(x, y, ballWidth);
         });
-        World.add(engine.world, divingPlatform);
+        Composite.add(engine.world, divingPlatform);
     } else {
         var ballStack = Composites.stack(width/2 - ballCols*ballWidth + ballWidth/2, -250, ballCols, ballRows, 0, 0, function(x, y) {
             return Bodies.circle(x, y, ballWidth);
@@ -176,7 +177,7 @@ window.addEventListener('load', function() {
     Events.on(engine, 'beforeUpdate', function(event) { //Smooth camera? Dampening?
         var agentBounds = Composite.bounds(players[0].physics) //edit these bounds so that player is centered at 1/3 height from bottom, not centered
         agentBounds.min.y -= height/3;
-        agentBounds.min.y -= height/3;
+        agentBounds.max.y -= height/3;
         Render.lookAt(render, agentBounds, {x: chunkSize*innerChunkAmt*1/2, y: height/3});
 
     });
@@ -222,10 +223,10 @@ window.addEventListener('load', function() {
     });
 
     // add all of the bodies to the world
-    World.add(engine.world, [ballStack, ground, LWall, RWall]);
-
-    for (var i=0; i<players.length; i++){
-        World.add(engine.world, players[i].physics)
+    if (balls){
+        Composite.add(engine.world, [ballStack, ground, LWall, RWall]);
+    } else {
+        Composite.add(engine.world, [ground, LWall, RWall])
     }
     // run the engine
     Engine.run(engine);
