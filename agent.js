@@ -7,27 +7,39 @@ const agentSpawnY = -500;
 const MAX_TORQUE = 0.25;
 
 var Engine = Matter.Engine,
-        Render = Matter.Render,
-        Bodies = Matter.Bodies,
-        Body = Matter.Body,
-        Composites = Matter.Composites,
-        Composite = Matter.Composite,
-        Constraint = Matter.Constraint,
-        Constraints = Matter.constraints,
-        Events = Matter.Events,
-        Bounds = Matter.Bounds;
+    Render = Matter.Render,
+    Bodies = Matter.Bodies,
+    Body = Matter.Body,
+    Composites = Matter.Composites,
+    Composite = Matter.Composite,
+    Constraint = Matter.Constraint,
+    Constraints = Matter.constraints,
+    Events = Matter.Events,
+    Bounds = Matter.Bounds;
+    Detector = Matter.Detector;
+
+// //Fix bug
+Detector.canCollide = function (filterA, filterB) {
+    //console.log(filterA.layer, filterB.layer)
+    if (filterA.layer != -1 && filterB.layer != -1){
+        return (filterA.layer == filterB.layer || (filterA.layer == 0 || filterB.layer==0));
+    } else {
+        return false;
+    }
+}  
 
 function Agent (genome) {
     /*********************
      * Define Body Parts *
      *********************/
-    layer = players.length * 3
+    const layer = -1
 
     const headOptions = {
         friction: 1,
         frictionAir: 0.05,
         collisionFilter: {
             group: layer,
+            layer: (players.length+1)
         },
         render: {
             fillStyle: "#FFBC42",
@@ -38,6 +50,7 @@ function Agent (genome) {
         frictionAir: 0.05,
         collisionFilter: {
            group: layer-2,
+           layer: (players.length+1)
         },
         chamfer: {
             radius: 20,
@@ -52,6 +65,7 @@ function Agent (genome) {
         frictionAir: 0.03,
         collisionFilter: {
            group: layer-1,
+           layer: (players.length+1)
         },
         chamfer: {
             radius: 10,
@@ -65,6 +79,7 @@ function Agent (genome) {
         frictionAir: 0.03,
         collisionFilter: {
            group: layer-2,
+           layer: (players.length+1)
         },
         chamfer: {
             radius: 10,
@@ -78,6 +93,7 @@ function Agent (genome) {
         frictionAir: 0.03,
         collisionFilter: {
            group: layer-2,
+           layer: (players.length+1)
         },
         chamfer: {
             radius: 10,
@@ -109,6 +125,7 @@ function Agent (genome) {
         parts: [chest, leftUpperLeg, rightUpperLeg],
         collisionFilter: {
            group: layer-2,
+           layer: (players.length+1)
         },
     });
 
@@ -242,7 +259,7 @@ function Agent (genome) {
     });
     players.push(this);
 }
-    //NOTE: body index is discrete integer from 0 - 7
+    //NOTE: body index is discrete integer from 3 - 7 inclusive
     //Force magnitude from -Math.pi/30 --> +Math.pi/30
     //when implementing output layer --> fix bug all values are the same
     //all values are positive? allow for negative values
@@ -251,7 +268,7 @@ Agent.prototype = {
         Body.setAngularVelocity(this.physics.bodies[bodyIndex], forceMagnitude);
     },
     score: function(){ // Fix: Only call at end of evalution
-        this.brain.score += Composite.bounds(this.physics).max.x //+ velX?
+        this.brain.score += Composite.bounds(this.physics).max.x //+ highest velX?
         highestScore = this.brain.score > highestScore ? this.brain.score : highestScore;
     },
     update: function(){
